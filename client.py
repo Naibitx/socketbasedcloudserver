@@ -13,7 +13,7 @@ def connection_to_server(): #connecitng to server function
     print(f"Connected to server in {IP}: {PORT}")
     return client_socket
 
-def upload_file(client_socket, filename):
+def upload_file(client_socket, filename): #file uploading function
     if not os.path.exists(filename):
         print("File cant be found OH OH")
         return
@@ -28,4 +28,21 @@ def upload_file(client_socket, filename):
     else:
         print(f"Server response: {response}")
 
+def download_file(client_socket, filename):
+    client_socket.sendall(f"download {filename}".encode(FORMAT))
+    response = client_socket.recv(SIZE).decode(FORMAT)
+
+    if response == "NOT_FOUND":
+        print("we did not find the file on the server pal")
+        return
+    elif response == "READY":
+        if not os.path.exists("downloads"):#we are making sure the downloads folder exists
+            os.mkdir("downloads")
+        
+        with open(f"downloads/ {filename}", "wb") as f:
+            data = client_socket.revc(4096)
+            f.write(data)
+        print(f"File '{filename}' was downloaded to /downloads/")
+    else:
+        print(f"Server reponse: {response}")
 
