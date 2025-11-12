@@ -28,7 +28,7 @@ def upload_file(client_socket, filename): #file uploading function
     else:
         print(f"Server response: {response}")
 
-def download_file(client_socket, filename):
+def download_file(client_socket, filename): #file downloading function
     client_socket.sendall(f"download {filename}".encode(FORMAT))
     response = client_socket.recv(SIZE).decode(FORMAT)
 
@@ -36,7 +36,7 @@ def download_file(client_socket, filename):
         print("we did not find the file on the server pal")
         return
     elif response == "READY":
-        if not os.path.exists("downloads"):#we are making sure the downloads folder exists
+        if not os.path.exists("downloads"): #we are making sure the downloads folder exists
             os.mkdir("downloads")
         
         with open(f"downloads/ {filename}", "wb") as f:
@@ -45,4 +45,37 @@ def download_file(client_socket, filename):
         print(f"File '{filename}' was downloaded to /downloads/")
     else:
         print(f"Server reponse: {response}")
+
+def menu_client(client_socket):
+    while True:
+        print("\n-----Menu-----")
+        print(" upload <filename>\n")
+        print(" download <filename>\n")
+        print(" delete <filename>\n")
+        print(" dir\n")
+        print(" subfolder <create|delete> <folder>\n")
+        print(" exit")
+
+        command= input("\n Enter command: ").strip()
+
+        if command.lower() == "exit": #this handles the exit command
+            client_socket.sendall(command.encode(FORMAT))
+            print("Exiting")
+            break
+
+        elif command.startswith("uplaod"): #handles upload comamnd
+            parts= command.split()
+            if len(parts) == 2:
+                upload_file(client_socket, parts[1])
+            else:
+                print("Using: upload <filename>")
+            continue
+        elif command.startswith("downalod"): #handles donwload command
+            parts= command.split()
+            if len(parts) == 2:
+                download_file(client_socket, parts[1])
+            else:
+                print("Using: download <filename>")
+            continue
+
 

@@ -57,7 +57,7 @@ def handle_client (conn,addr):
         data = conn.recv(SIZE).decode(FORMAT)
         data = data.split("@")
         cmd = data[0]
-       
+
         send_data = "OK@"
 
         if cmd == "LOGOUT":
@@ -65,12 +65,13 @@ def handle_client (conn,addr):
 
         elif cmd == "TASK":
             print(f"[TASK] Command received from {addr}")
+        
         logging.info(f"{addr} issued TASK command")
-            send_data += "LOGOUT from the server.\n"
-            conn.send(send_data.encode(FORMAT))
+        send_data += "LOGOUT from the server.\n"
+        conn.send(send_data.encode(FORMAT))
 
         CHUNK_SIZE = 64 * 1024  # 64 KB per chunk for faster transfer
-
+        
         elif cmd == "UPLOAD":
             try:
                 filename = data[1]
