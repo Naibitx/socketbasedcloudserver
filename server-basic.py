@@ -31,21 +31,30 @@ def generate_unique_filename(filename): # Helps avoid overwriting existing files
 
     return unique_filename
 
+def generate_salt():
+    return os.urandom(16)  # 16 bytes salt
+
+def hash_password(password, salt):
+    return hashlib.sha256(password.encode() + salt).hexdigest()
+
 def authenticate(conn):
         conn.send("AUTH@Username:".encode(FORMAT))
         username = conn.recv(SIZE).decode(FORMAT)
         conn.send("AUTH@Password:".encode(FORMAT))
         password = conn.recv(SIZE).decode(FORMAT)
 
-        hashed_pw = hashlib.sha256(password.encode()).hexdigest()
-
         with open("users.txt", "r") as f:
-                for line in f:
-                    stored_user, stored_hash = line.strip().split(":")
-                    if username == stored_user and hashed_pw == stored_hash:
-                            conn.send("OK@Login successful.".encode(FORMAT))
-                            print(f"[AUTH] Login successful for user: {username}")
-                            return True
+        for line in f:
+            stored_user, stored_hash, stored_salt = line.strip().split(":")
+            if username == stored_user:
+                # Convert the stored salt from hex to bytes
+                salt = bytes.fromhex(stored_salt)
+                # Hash the provided password with the stored salt
+                hashed_pw = hash_password(password, salt)
+                if hashed_pw == stored_hash:
+                    conn.send("OK@Login successful.".encode(FORMAT))
+                    print(f"[AUTH] Login successful for user: {username}")
+                    return True
         conn.send("ERR@Invalid credentials.".encode(FORMAT))
         logging.warning(f"Failed login attempt for user: {username}")
         print(f"[AUTH] Failed login attempt for user: {username}")
