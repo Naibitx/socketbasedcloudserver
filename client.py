@@ -77,5 +77,16 @@ def menu_client(client_socket):
             else:
                 print("Using: download <filename>")
             continue
+        client_socket.sendall(command.encode(FORMAT))
+        data= client_socket.recv(4096).decode(FORMAT)
+        print("Server:", data)
 
-
+if __name__== "__main__":
+    client_socket= connection_to_server()
+    try:
+        menu_client(client_socket)
+    except KeyboardInterrupt:
+        print("\n Connection was closed by user")
+    finally:
+        client_socket.close()
+        print("\nConnection closed")
