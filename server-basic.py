@@ -18,6 +18,19 @@ SIZE = 64 * 1024
 FORMAT = "utf-8"
 SERVER_PATH = "server"
 
+def generate_unique_filename(filename): # Helps avoid overwriting existing files
+    # Split the file into name and extension
+    base, ext = os.path.splitext(filename)
+    counter = 1
+    unique_filename = filename
+    
+    # Check if the file already exists and modify the filename accordingly
+    while os.path.exists(os.path.join(SERVER_PATH, unique_filename)):
+        unique_filename = f"{base}_{counter}{ext}"  # Append counter to the filename
+        counter += 1
+
+    return unique_filename
+
 def authenticate(conn):
         conn.send("AUTH@Username:".encode(FORMAT))
         username = conn.recv(SIZE).decode(FORMAT)
@@ -84,7 +97,7 @@ def handle_client (conn,addr):
                     conn.send("ERR@Unsupported file type.".encode(FORMAT))
                     continue
         
-                # Check if file exists
+                # Check if file exists and ask if user wants to overwrite
                 if os.path.exists(filepath):
                     conn.send("ERR@File exists. Overwrite? (y/n)".encode(FORMAT))
                     choice = conn.recv(SIZE).decode(FORMAT)
@@ -93,6 +106,10 @@ def handle_client (conn,addr):
                         logging.info(f"{addr} cancelled upload of file: {filename}")
                         print(f"[UPLOAD] {addr} cancelled upload of {filename}")
                         continue
+
+                # Generrate unique file name if file already exists
+                filename= = generate_unique_filename(filename)
+                filepath = os.path.join(SERVER_PATH, filename)
         
                 conn.send("OK@Ready to receive.".encode(FORMAT))
         
