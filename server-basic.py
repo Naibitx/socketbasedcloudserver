@@ -1,7 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-# Author : Ayesha S. Dina
-
 import os
 import socket
 import threading
@@ -18,7 +14,7 @@ logging.basicConfig(
 IP = "localhost" ### gethostname()
 PORT = 4450
 ADDR = (IP,PORT)
-SIZE = 1024
+SIZE = 64 * 1024
 FORMAT = "utf-8"
 SERVER_PATH = "server"
 
@@ -73,12 +69,20 @@ def handle_client (conn,addr):
             send_data += "LOGOUT from the server.\n"
             conn.send(send_data.encode(FORMAT))
 
+        CHUNK_SIZE = 64 * 1024  # 64 KB per chunk for faster transfer
+
         elif cmd == "UPLOAD":
             try:
                 filename = data[1]
                 filesize = int(data[2])
                 filepath = os.path.join(SERVER_PATH, filename)
-
+        
+                # Check file type first
+                ext = os.path.splitext(filename)[1].lower()
+                if ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
+                    conn.send("ERR@Unsupported file type.".encode(FORMAT))
+                    continue
+        
                 # Check if file exists
                 if os.path.exists(filepath):
                     conn.send("ERR@File exists. Overwrite? (y/n)".encode(FORMAT))
@@ -88,60 +92,95 @@ def handle_client (conn,addr):
                         logging.info(f"{addr} cancelled upload of file: {filename}")
                         print(f"[UPLOAD] {addr} cancelled upload of {filename}")
                         continue
-
+        
                 conn.send("OK@Ready to receive.".encode(FORMAT))
-
+        
                 # Receive file in chunks
+                received = 0
                 with open(filepath, "wb") as f:
-                    received = 0
                     while received < filesize:
-                        bytes_read = conn.recv(SIZE)
+                        bytes_read = conn.recv(min(CHUNK_SIZE, filesize - received))
                         if not bytes_read:
                             break
                         f.write(bytes_read)
                         received += len(bytes_read)
-
+        
+                # Verify actual file size
+                actual_size = os.path.getsize(filepath)
+                if ext == ".txt" and actual_size < 25 * 1024 * 1024:
+                    os.remove(filepath)
+                    conn.send("ERR@Text file too small (min 25 MB).".encode(FORMAT))
+                    continue
+                elif ext in [".mp3", ".wav"] and actual_size < 1 * 1024 * 1024 * 1024:
+                    os.remove(filepath)
+                    conn.send("ERR@Audio file too small (min 1 GB).".encode(FORMAT))
+                    continue
+                elif ext in [".mp4", ".avi", ".mkv"] and actual_size < 2 * 1024 * 1024 * 1024:
+                    os.remove(filepath)
+                    conn.send("ERR@Video file too small (min 2 GB).".encode(FORMAT))
+                    continue
+        
                 conn.send(f"OK@Uploaded {filename}".encode(FORMAT))
                 logging.info(f"{addr} uploaded file: {filename}")
                 print(f"[UPLOAD] {addr} → {filename}")
-
+        
             except Exception as e:
                 logging.error(f"Upload failed for {addr}: {str(e)}")
                 print(f"[UPLOAD ERROR] {addr} failed: {str(e)}")
                 conn.send(f"ERR@Upload failed: {str(e)}".encode(FORMAT))
-
+        
+        
         elif cmd == "DOWNLOAD":
             try:
                 filename = data[1]
                 filepath = os.path.join(SERVER_PATH, filename)
-
+        
                 if not os.path.exists(filepath):
                     conn.send("ERR@File not found.".encode(FORMAT))
                     continue
-
+        
+                # Check file type and minimum size
                 filesize = os.path.getsize(filepath)
+                ext = os.path.splitext(filename)[1].lower()
+        
+                if ext == ".txt" and filesize < 25 * 1024 * 1024:
+                    conn.send("ERR@Text file too small (min 25 MB).".encode(FORMAT))
+                    continue
+                elif ext in [".mp3", ".wav"] and filesize < 1 * 1024 * 1024 * 1024:
+                    conn.send("ERR@Audio file too small (min 1 GB).".encode(FORMAT))
+                    continue
+                elif ext in [".mp4", ".avi", ".mkv"] and filesize < 2 * 1024 * 1024 * 1024:
+                    conn.send("ERR@Video file too small (min 2 GB).".encode(FORMAT))
+                    continue
+                elif ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
+                    conn.send("ERR@Unsupported file type.".encode(FORMAT))
+                    continue
+        
+                # Send file size to client
                 conn.send(f"OK@{filesize}".encode(FORMAT))
-
+        
                 # Wait for client ready
                 ack = conn.recv(SIZE).decode(FORMAT)
                 if ack != "READY":
                     continue
-
+        
+                # Send file in chunks
                 with open(filepath, "rb") as f:
                     while True:
-                        bytes_read = f.read(SIZE)
+                        bytes_read = f.read(CHUNK_SIZE)
                         if not bytes_read:
                             break
                         conn.sendall(bytes_read)
-
+        
                 conn.send("OK@Download complete.".encode(FORMAT))
                 logging.info(f"{addr} downloaded file: {filename}")
                 print(f"[DOWNLOAD] {addr} ← {filename}")
-
+        
             except Exception as e:
                 conn.send(f"ERR@Download failed: {str(e)}".encode(FORMAT))
                 logging.error(f"Download failed for {addr}: {str(e)}")
                 print(f"[DOWNLOAD ERROR] {addr} failed: {str(e)}")
+
 
         elif cmd == "DELETE":
             try:
