@@ -74,8 +74,9 @@ def authenticate(conn):
 
 ### to handle the clients
 def handle_client (conn,addr):
-    record_event("server", "CLIENT_CONNECT", 0, 0)
-    start_time = 0
+    # Analytics: mark client connect time
+    connect_time = time.perf_counter()
+    record_event("server", "CLIENT_CONNECT", connect_time, connect_time)
     
     if not authenticate(conn):
         logging.info(f"Authentication failed for {addr}.")
@@ -87,10 +88,11 @@ def handle_client (conn,addr):
     conn.send("OK@Welcome to the server".encode(FORMAT))
 
     while True:
-        try: 
+        try:
             data = conn.recv(SIZE).decode(FORMAT)
             if not data:
                 break
+
             data = data.split("@")
             cmd = data[0]
             CHUNK_SIZE = 64 * 1024  # 64 KB per chunk for faster transfer
@@ -105,19 +107,21 @@ def handle_client (conn,addr):
                 logging.info(f"{addr} issued TASK command")
                 send_data += "LOGOUT from the server.\n"
                 conn.send(send_data.encode(FORMAT))
-        
+
             elif cmd == "UPLOAD":
+                # Analytics: start timing upload on the server
+                upload_start = time.perf_counter()
                 try:
                     filename = data[1]
                     filesize = int(data[2])
                     filepath = os.path.join(SERVER_PATH, filename)
-            
+
                     # Check file type first
                     ext = os.path.splitext(filename)[1].lower()
                     if ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
                         conn.send("ERR@Unsupported file type.".encode(FORMAT))
                         continue
-            
+
                     # Check if file exists and ask if user wants to overwrite
                     if os.path.exists(filepath):
                         conn.send("ERR@File exists. Overwrite? (y/n)".encode(FORMAT))
@@ -128,11 +132,11 @@ def handle_client (conn,addr):
                             print(f"[UPLOAD] {addr} cancelled upload of {filename}")
                             continue
 
-                    # Generrate unique file name if file already exists
+                    # Generate (or reuse) file path
                     filepath = os.path.join(SERVER_PATH, filename)
-            
+
                     conn.send("OK@Ready to receive.".encode(FORMAT))
-            
+
                     # Receive file in chunks
                     received = 0
                     with open(filepath, "wb") as f:
@@ -142,7 +146,7 @@ def handle_client (conn,addr):
                                 break
                             f.write(bytes_read)
                             received += len(bytes_read)
-            
+
                     # Verify actual file size
                     actual_size = os.path.getsize(filepath)
                     if ext == ".txt" and actual_size < 25 * 1024 * 1024:
@@ -157,30 +161,35 @@ def handle_client (conn,addr):
                         os.remove(filepath)
                         conn.send("ERR@Video file too small (min 2 GB).".encode(FORMAT))
                         continue
-            
+
                     conn.send(f"OK@Uploaded {filename}".encode(FORMAT))
                     logging.info(f"{addr} uploaded file: {filename}")
                     print(f"[UPLOAD] {addr} → {filename}")
-            
+
+                    # Analytics: record successful upload on the server
+                    upload_end = time.perf_counter()
+                    record_transfer("server", "UPLOAD", filename, actual_size, upload_start, upload_end)
+
                 except Exception as e:
                     logging.error(f"Upload failed for {addr}: {str(e)}")
                     print(f"[UPLOAD ERROR] {addr} failed: {str(e)}")
                     conn.send(f"ERR@Upload failed: {str(e)}".encode(FORMAT))
-            
-            
+
             elif cmd == "DOWNLOAD":
+                # Analytics: start timing download on the server
+                download_start = time.perf_counter()
                 try:
                     filename = data[1]
                     filepath = os.path.join(SERVER_PATH, filename)
-            
+
                     if not os.path.exists(filepath):
                         conn.send("ERR@File not found.".encode(FORMAT))
                         continue
-            
+
                     # Check file type and minimum size
                     filesize = os.path.getsize(filepath)
                     ext = os.path.splitext(filename)[1].lower()
-            
+
                     if ext == ".txt" and filesize < 25 * 1024 * 1024:
                         conn.send("ERR@Text file too small (min 25 MB).".encode(FORMAT))
                         continue
@@ -193,15 +202,15 @@ def handle_client (conn,addr):
                     elif ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
                         conn.send("ERR@Unsupported file type.".encode(FORMAT))
                         continue
-            
+
                     # Send file size to client
                     conn.send(f"OK@{filesize}".encode(FORMAT))
-            
+
                     # Wait for client ready
                     ack = conn.recv(SIZE).decode(FORMAT)
                     if ack != "READY":
                         continue
-            
+
                     # Send file in chunks
                     with open(filepath, "rb") as f:
                         while True:
@@ -209,16 +218,19 @@ def handle_client (conn,addr):
                             if not bytes_read:
                                 break
                             conn.sendall(bytes_read)
-            
+
                     conn.send("OK@Download complete.".encode(FORMAT))
                     logging.info(f"{addr} downloaded file: {filename}")
                     print(f"[DOWNLOAD] {addr} ← {filename}")
-            
+
+                    # Analytics: record successful download on the server
+                    download_end = time.perf_counter()
+                    record_transfer("server", "DOWNLOAD", filename, filesize, download_start, download_end)
+
                 except Exception as e:
                     conn.send(f"ERR@Download failed: {str(e)}".encode(FORMAT))
                     logging.error(f"Download failed for {addr}: {str(e)}")
                     print(f"[DOWNLOAD ERROR] {addr} failed: {str(e)}")
-
 
             elif cmd == "DELETE":
                 try:
@@ -280,9 +292,11 @@ def handle_client (conn,addr):
                     conn.send(f"ERR@Subfolder operation failed: {str(e)}".encode(FORMAT))
                     logging.error(f"Subfolder operation failed for {addr}: {str(e)}")
                     print(f"[SUBFOLDER ERROR] {addr} failed {action} '{folder_name}': {str(e)}")
+
         except Exception as e:
             conn.send(f"ERR@{str(e)}".encode(FORMAT))
             logging.error(f"Client {addr} error: {str(e)}")
+
 
 
     print(f"[DISCONNECT] Client disconnected: {addr}")

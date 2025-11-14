@@ -141,19 +141,34 @@ def menu_client(client_socket):
             else:
                 print("Usage: download <filename>")
         else:
+            
             parts = command.split()
+
+            # Start timing just before we send the request
+            cmd_start = time.perf_counter()
+
             if len(parts) == 1 and parts[0] == "dir":
                 client_socket.send("DIR".encode(FORMAT))
-            elif parts[0] == "delete":
+
+            elif parts[0] == "delete" and len(parts) >= 2:
                 client_socket.send(f"DELETE@{parts[1]}".encode(FORMAT))
-            elif parts[0] == "subfolder":
+
+            elif parts[0] == "subfolder" and len(parts) >= 3:
                 client_socket.send(f"SUBFOLDER@{parts[1]}@{parts[2]}".encode(FORMAT))
+
             else:
                 print("Invalid command.")
                 continue
+
+            # Wait for the server response
             data = client_socket.recv(SIZE).decode(FORMAT)
+            cmd_end = time.perf_counter()
+
             print("Server:", data)
-            record_event("client", parts[0], 0, 0)
+
+            # Log system response time for this command
+            record_event("client", parts[0], cmd_start, cmd_end)
+
 
 if __name__== "__main__":
     client_socket= connection_to_server()
