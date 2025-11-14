@@ -115,7 +115,6 @@ def handle_client (conn,addr):
                         continue
 
                 # Generrate unique file name if file already exists
-                filename= = generate_unique_filename(filename)
                 filepath = os.path.join(SERVER_PATH, filename)
         
                 conn.send("OK@Ready to receive.".encode(FORMAT))
