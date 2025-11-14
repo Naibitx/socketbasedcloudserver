@@ -3,6 +3,7 @@ import socket
 import threading
 import hashlib
 import logging
+import time
 from analytics import record_transfer, record_event
 from cryptography.fernet import Fernet
 
@@ -73,8 +74,9 @@ def authenticate(conn):
 
 ### to handle the clients
 def handle_client (conn,addr):
-    start_time= record_event("server", "CLIENT_CONNECT", 0, 0)["start_clock"]
-
+    record_event("server", "CLIENT_CONNECT", 0, 0)
+    start_time = 0
+    
     if not authenticate(conn):
         logging.info(f"Authentication failed for {addr}.")
         conn.close()
@@ -303,4 +305,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
