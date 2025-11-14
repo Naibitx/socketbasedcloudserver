@@ -23,3 +23,8 @@
 2025-11-14 13:15:22,824 - INFO - ('10.200.102.190', 52674) - Authentication successful.
 2025-11-14 13:17:40,854 - INFO - ('10.200.102.190', 52674) create subfolder: text
 2025-11-14 13:17:55,889 - INFO - ('10.200.102.190', 52674) requested directory listing
+2025-11-14 14:46:07,187 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 14:46:23,182 - INFO - ('10.200.102.190', 53235) - Authentication successful.
+2025-11-14 14:52:54,083 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 14:53:09,449 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 14:54:33,320 - INFO - ('127.0.0.1', 53321) - Authentication successful.

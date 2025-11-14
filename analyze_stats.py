@@ -23,8 +23,7 @@ def print_summary(df):
     print("\n=== TRANSFER SUMMARY (UPLOAD/DOWNLOAD) ===")
     transfers = df[df["operation"].isin(["UPLOAD", "DOWNLOAD"])]
     if not transfers.empty:
-        print(transfers[["role", "operation", "file_name", "MB",
-                         "duration_sec", "data_rate_MBps"]].head())
+        print(transfers[["role", "operation", "file_name", "MB","duration_sec", "data_rate_MBps"]].head())
         print("\nBasic stats:")
         print(transfers[["MB", "duration_sec", "data_rate_MBps"]].describe())
     else:

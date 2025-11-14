@@ -4,7 +4,7 @@ import time
 from analytics import record_transfer, record_event
 from cryptography.fernet import Fernet
 
-IP = "10.200.102.190"
+IP = "localhost"
 PORT= 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
