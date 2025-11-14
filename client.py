@@ -1,7 +1,7 @@
 import socket
 import os
 
-IP = "localhost"
+IP = "10.200.102.190"
 PORT= 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
