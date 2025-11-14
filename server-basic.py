@@ -11,7 +11,7 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-IP = "localhost" ### gethostname()
+IP = "0.0.0.0" ### gethostname()
 PORT = 4450
 ADDR = (IP,PORT)
 SIZE = 64 * 1024
