@@ -1,15 +1,23 @@
 import socket
 import os
+import time
+from analytics import record_transfer, record_event
+from cryptography.fernet import Fernet
 
-IP = "10.200.102.97"
+IP = "10.200.102.190"
 PORT= 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
 FORMAT = "utf-8"
 
+cipher = None
+
 def connection_to_server(): #connecitng to server function
+    global cipher
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect(ADDR)
+    key_msg = client_socket.recv(SIZE).split(b"@")[0]
+    cipher = Fernet(key_msg)
     print(f"Connected to server in {IP}: {PORT}")
     return client_socket
 
@@ -37,25 +45,40 @@ def upload_file(client_socket, filename): #file uploading function
     if not os.path.exists(filename):
         print("File cant be found OH OH")
         return
+    ext = os.path.splitext(filename)[1].lower()
+    file_sizes = {".txt": 25*1024*1024, ".mp3": 1*1024*1024*1024,
+                ".wav": 1*1024*1024*1024, ".mp4": 2*1024*1024*1024,
+                ".avi": 2*1024*1024*1024, ".mkv": 2*1024*1024*1024}
 
     filesize = os.path.getsize(filename)
-    client_socket.send(f"UPLOAD@{filename}@{filesize}".encode(FORMAT))
+    if ext not in file_sizes or filesize < file_sizes[ext]:
+        print(f"File type or size not allowed. Minimum {file_sizes.get(ext,0)} bytes.")
+        return
 
+    client_socket.send(f"UPLOAD@{filename}@{filesize}".encode(FORMAT))
     response = client_socket.recv(SIZE).decode(FORMAT)
     status, msg = response.split("@", 1)
 
-    if status == "ERR":
-        print("Server response:", msg)
-        return
+    if status == "ERR" and "Overwrite" in msg:
+        choice = input("Server says file exists. Overwrite? (y/n): ")
+        client_socket.send(choice.encode(FORMAT))
+        response = client_socket.recv(SIZE).decode(FORMAT)
+        status, msg = response.split("@", 1)
+        if status == "OK" and "cancelled" in msg:
+            print(msg)
+            return
 
     if status == "OK":
+        start= time.perf_counter()
         with open(filename, "rb") as f:
             while True:
                 data = f.read(SIZE)
                 if not data:
                     break
                 client_socket.sendall(data)
-        print("File was successfully uplaoded")
+        end = time.perf_counter()
+        record_transfer("client", "UPLOAD", filename, filesize, start, end)
+        print("File uploaded successfully.")
 
 def download_file(client_socket, filename): #file downloading function
     client_socket.send(f"DOWNLOAD@{filename}".encode(FORMAT))
@@ -74,6 +97,8 @@ def download_file(client_socket, filename): #file downloading function
         os.mkdir("downloads")
         
     filepath = f"downloads/{filename}"
+
+    start = time.perf_counter()
     with open(filepath, "wb") as f:
         remaining = filesize
         while remaining > 0:
@@ -82,6 +107,8 @@ def download_file(client_socket, filename): #file downloading function
                 break
             f.write(chunk)
             remaining -= len(chunk)
+    end = time.perf_counter()
+    record_transfer("client", "DOWNLOAD", filename, filesize, start, end)
 
     print(f"File '{filename}' was downloaded to /downloads/")
 
@@ -97,44 +124,36 @@ def menu_client(client_socket):
 
         command= input("\n Enter command: ").strip()
 
-        if command.lower() == "exit": #this handles the exit command
+        
+        if command.lower() == "exit":
             client_socket.send("LOGOUT@".encode(FORMAT))
-            print("Exiting")
             break
-
-        elif command.startswith("upload"): #handles upload comamnd
-            parts= command.split()
+        elif command.startswith("upload"):
+            parts = command.split()
             if len(parts) == 2:
                 upload_file(client_socket, parts[1])
             else:
-                print("Using: upload <filename>")
-            continue
-
-        elif command.startswith("download"): #handles donwload command
-            parts= command.split()
+                print("Usage: upload <filename>")
+        elif command.startswith("download"):
+            parts = command.split()
             if len(parts) == 2:
                 download_file(client_socket, parts[1])
             else:
-                print("Using: download <filename>")
-            continue
-
-        parts = command.split()
-
-        if len(parts) == 1:
-            if command == "dir":
-                client_socket.send("DIR".encode(FORMAT))
-
+                print("Usage: download <filename>")
         else:
-            if parts[0] == "delete":
+            parts = command.split()
+            if len(parts) == 1 and parts[0] == "dir":
+                client_socket.send("DIR".encode(FORMAT))
+            elif parts[0] == "delete":
                 client_socket.send(f"DELETE@{parts[1]}".encode(FORMAT))
             elif parts[0] == "subfolder":
                 client_socket.send(f"SUBFOLDER@{parts[1]}@{parts[2]}".encode(FORMAT))
             else:
                 print("Invalid command.")
                 continue
-
-        data= client_socket.recv(4096).decode(FORMAT)
-        print("Server:", data)
+            data = client_socket.recv(SIZE).decode(FORMAT)
+            print("Server:", data)
+            record_event("client", parts[0], 0, 0)
 
 if __name__== "__main__":
     client_socket= connection_to_server()

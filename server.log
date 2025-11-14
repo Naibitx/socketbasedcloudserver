@@ -2,3 +2,13 @@
 2025-11-13 21:11:57,536 - INFO - Server started on localhost:4450
 2025-11-13 21:12:01,867 - INFO - Server started on localhost:4450
 2025-11-13 21:13:13,953 - INFO - Server started on localhost:4450
+2025-11-14 10:36:55,599 - INFO - Server started on localhost:4450
+2025-11-14 10:40:36,973 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 10:43:41,872 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 10:45:30,786 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 10:46:17,677 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 10:50:52,494 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 10:51:12,198 - WARNING - Failed login attempt for user: naibys
+2025-11-14 10:51:12,198 - INFO - Authentication failed for ('10.200.102.190', 51675).
+2025-11-14 11:00:22,216 - WARNING - Failed login attempt for user: naibys
+2025-11-14 11:00:22,217 - INFO - Authentication failed for ('10.200.102.190', 51715).
