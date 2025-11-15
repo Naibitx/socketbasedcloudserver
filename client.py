@@ -16,7 +16,7 @@ def connection_to_server(): #connecitng to server function
     global cipher
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect(ADDR)
-    key_msg = client_socket.recv(SIZE).split(b"@")[0]
+    key_msg = client_socket.recv(SIZE)
     cipher = Fernet(key_msg)
     print(f"Connected to server in {IP}: {PORT}")
     return client_socket
@@ -25,11 +25,11 @@ def authenticate(client_socket): #login function
     while True:
         server_msg = client_socket.recv(SIZE).decode(FORMAT)
 
-        if server_msg.startswith("AUTH@Username"):
+        if server_msg.startswith("AUTH@Username:"):
             username = input("Username: ")
             client_socket.send(username.encode(FORMAT))
 
-        elif server_msg.startswith("AUTH@Password"):
+        elif server_msg.startswith("AUTH@Password:"):
             password = input("Password: ")
             client_socket.send(password.encode(FORMAT))
 
@@ -124,7 +124,6 @@ def menu_client(client_socket):
 
         command= input("\n Enter command: ").strip()
 
-        
         if command.lower() == "exit":
             client_socket.send("LOGOUT@".encode(FORMAT))
             break
@@ -141,10 +140,7 @@ def menu_client(client_socket):
             else:
                 print("Usage: download <filename>")
         else:
-            
             parts = command.split()
-
-            # Start timing just before we send the request
             cmd_start = time.perf_counter()
 
             if len(parts) == 1 and parts[0] == "dir":
@@ -160,15 +156,11 @@ def menu_client(client_socket):
                 print("Invalid command.")
                 continue
 
-            # Wait for the server response
             data = client_socket.recv(SIZE).decode(FORMAT)
             cmd_end = time.perf_counter()
 
             print("Server:", data)
-
-            # Log system response time for this command
             record_event("client", parts[0], cmd_start, cmd_end)
-
 
 if __name__== "__main__":
     client_socket= connection_to_server()
