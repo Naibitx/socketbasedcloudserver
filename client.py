@@ -60,9 +60,7 @@ def upload_file(client_socket, filename):
         print("File cant be found OH OH")
         return
     ext = os.path.splitext(filename)[1].lower()
-    file_sizes = {".txt": 25*1024*1024, ".mp3": 1*1024*1024*1024,
-                  ".wav": 1*1024*1024*1024, ".mp4": 2*1024*1024*1024,
-                  ".avi": 2*1024*1024*1024, ".mkv": 2*1024*1024*1024}
+    file_sizes = {".txt": 25*1024*1024, ".mp3": 1*1024*1024*1024, ".wav": 1*1024*1024*1024, ".mp4": 2*1024*1024*1024, ".avi": 2*1024*1024*1024, ".mkv": 2*1024*1024*1024}
     filesize = os.path.getsize(filename)
     if ext not in file_sizes or filesize < file_sizes[ext]:
         print(f"File type or size not allowed. Minimum {file_sizes.get(ext,0)} bytes.")

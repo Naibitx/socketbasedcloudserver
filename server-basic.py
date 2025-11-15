@@ -94,7 +94,7 @@ def recv_raw(conn, n):
 
 def authenticate(conn):
         try:
-            conn.sendall(AES_Key + b"\n")
+            conn.sendall(AES_Key)
             send_ctrl(conn, "AUTH@Username:")
             username = recv_ctrl(conn)
             if username is None:
