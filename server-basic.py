@@ -99,7 +99,7 @@ def authenticate(conn):
             username = recv_ctrl(conn)
             if username is None:
                 return False
-            send_ctrl(conn, "AUTH@Password")
+            send_ctrl(conn, "AUTH@Password:")
             password = recv_ctrl(conn)
             if password is None:
                 return False

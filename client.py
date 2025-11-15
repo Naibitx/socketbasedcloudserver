@@ -82,17 +82,13 @@ def upload_file(client_socket, filename): #file uploading function
 
 def download_file(client_socket, filename): #file downloading function
     client_socket.send(f"DOWNLOAD@{filename}".encode(FORMAT))
+    response = client_socket.recv(SIZE).decode(FORMAT)
 
-    while True:
-        response = client_socket.recv(SIZE).decode(FORMAT)
-        status, msg = response.split("@", 1)
+    status, msg = response.split("@", 1)
 
-        if status == "ERR":
-            print("we did not find the file on the server pal")
-            return
-
-        if status == "OK" and msg.isdigit():
-            break
+    if status == "ERR":
+        print("we did not find the file on the server pal")
+        return
 
     filesize = int(msg)
     client_socket.send("READY".encode(FORMAT))
@@ -148,6 +144,7 @@ def menu_client(client_socket):
             
             parts = command.split()
 
+            # Start timing just before we send the request
             cmd_start = time.perf_counter()
 
             if len(parts) == 1 and parts[0] == "dir":
@@ -163,11 +160,13 @@ def menu_client(client_socket):
                 print("Invalid command.")
                 continue
 
+            # Wait for the server response
             data = client_socket.recv(SIZE).decode(FORMAT)
             cmd_end = time.perf_counter()
 
             print("Server:", data)
 
+            # Log system response time for this command
             record_event("client", parts[0], cmd_start, cmd_end)
 
 
