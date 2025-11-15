@@ -24,20 +24,16 @@ AES_Key= Fernet.generate_key()
 cipher= Fernet (AES_Key)
 
 def generate_unique_filename(filename): # Helps avoid overwriting existing files
-    # Split the file into name and extension
     base, ext = os.path.splitext(filename)
     counter = 1
     unique_filename = filename
-    
-    # Check if the file already exists and modify the filename accordingly
     while os.path.exists(os.path.join(SERVER_PATH, unique_filename)):
-        unique_filename = f"{base}_{counter}{ext}"  # Append counter to the filename
+        unique_filename = f"{base}_{counter}{ext}"
         counter += 1
-
     return unique_filename
 
 def generate_salt():
-    return os.urandom(16)  # 16 bytes salt
+    return os.urandom(16)
 
 def hash_password(password, salt):
     return hashlib.sha256(password.encode() + salt).hexdigest()
@@ -62,9 +58,7 @@ def recv_ctrl(conn):
         except Exception:
             return None
         if not chunk:
-            # connection closed
             if buffer:
-                # return what we have without newline
                 val = buffer.decode(FORMAT)
                 _leftover[fil] = b""
                 return val
@@ -74,7 +68,6 @@ def recv_ctrl(conn):
             line, rest = buffer.split(b"\n", 1)
             _leftover[fil] = rest
             return line.decode(FORMAT)
-        # keep looping until newline
 
 def recv_raw(conn, n):
     fil = conn.fileno()
@@ -94,7 +87,7 @@ def recv_raw(conn, n):
 
 def authenticate(conn):
         try:
-            conn.sendall(AES_Key)
+            conn.sendall(AES_Key + b"\n")
             send_ctrl(conn, "AUTH@Username:")
             username = recv_ctrl(conn)
             if username is None:
@@ -126,9 +119,7 @@ def authenticate(conn):
                 pass
             return False
 
-### to handle the clients
 def handle_client (conn,addr):
-    # Analytics: mark client connect time
     connect_time = time.perf_counter()
     record_event("server", "CLIENT_CONNECT", connect_time, connect_time)
     
@@ -149,8 +140,7 @@ def handle_client (conn,addr):
 
             data = ctrl.split("@")
             cmd = data[0]
-            CHUNK_SIZE = 64 * 1024  # 64 KB per chunk for faster transfer
-
+            CHUNK_SIZE = 64 * 1024
             send_data = "OK@"
 
             if cmd == "LOGOUT":
@@ -163,20 +153,16 @@ def handle_client (conn,addr):
                 send_ctrl(conn, send_data.strip())
 
             elif cmd == "UPLOAD":
-                # Analytics: start timing upload on the server
                 upload_start = time.perf_counter()
                 try:
                     filename = data[1]
                     filesize = int(data[2])
                     filepath = os.path.join(SERVER_PATH, filename)
-
-                    # Check file type first
                     ext = os.path.splitext(filename)[1].lower()
                     if ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
                         send_ctrl(conn, "ERR@Unsupported file type.")
                         continue
 
-                    # Check if file exists and ask if user wants to overwrite
                     if os.path.exists(filepath):
                         send_ctrl(conn, "ERR@File exists. Overwrite? (y/n)")
                         choice = recv_ctrl(conn)
@@ -187,7 +173,6 @@ def handle_client (conn,addr):
                             continue
 
                     filepath = os.path.join(SERVER_PATH, filename)
-
                     send_ctrl(conn, "OK@Ready to receive.")
 
                     received = 0
@@ -200,7 +185,6 @@ def handle_client (conn,addr):
                             f.write(bytes_read)
                             received += len(bytes_read)
 
-                    # If no bytes were written and connection closed, handle gracefully
                     if not os.path.exists(filepath):
                         send_ctrl(conn, f"ERR@Upload failed: incomplete transfer.")
                         continue
@@ -222,7 +206,6 @@ def handle_client (conn,addr):
                     send_ctrl(conn, f"OK@Uploaded {filename}")
                     logging.info(f"{addr} uploaded file: {filename}")
                     print(f"[UPLOAD] {addr} → {filename}")
-
                     upload_end = time.perf_counter()
                     record_transfer("server", "UPLOAD", filename, actual_size, upload_start, upload_end)
 
@@ -235,12 +218,10 @@ def handle_client (conn,addr):
                         pass
 
             elif cmd == "DOWNLOAD":
-                # Analytics: start timing download on the server
                 download_start = time.perf_counter()
                 try:
                     filename = data[1]
                     filepath = os.path.join(SERVER_PATH, filename)
-
                     if not os.path.exists(filepath):
                         send_ctrl(conn, "ERR@File not found.")
                         continue
@@ -262,7 +243,6 @@ def handle_client (conn,addr):
                         continue
 
                     send_ctrl(conn, f"OK@{filesize}")
-
                     ack = recv_ctrl(conn)
                     if ack is None or ack != "READY":
                         continue
@@ -277,7 +257,6 @@ def handle_client (conn,addr):
                     send_ctrl(conn, "OK@Download complete.")
                     logging.info(f"{addr} downloaded file: {filename}")
                     print(f"[DOWNLOAD] {addr} ← {filename}")
-
                     download_end = time.perf_counter()
                     record_transfer("server", "DOWNLOAD", filename, filesize, download_start, download_end)
 
@@ -293,16 +272,13 @@ def handle_client (conn,addr):
                 try:
                     filename = data[1]
                     filepath = os.path.join(SERVER_PATH, filename)
-
                     if not os.path.exists(filepath):
                         send_ctrl(conn, "ERR@File not found.")
                         continue
-
                     os.remove(filepath)
                     send_ctrl(conn, f"OK@Deleted {filename}")
                     logging.info(f"{addr} deleted file: {filename}")
                     print(f"[DELETE] {addr} removed {filename}")
-
                 except Exception as e:
                     try:
                         send_ctrl(conn, f"ERR@Delete failed: {str(e)}")
@@ -328,16 +304,14 @@ def handle_client (conn,addr):
 
             elif cmd == "SUBFOLDER":
                 try:
-                    action = data[1]        # "create" or "delete"
+                    action = data[1]
                     folder_name = data[2]
                     folder_path = os.path.join(SERVER_PATH, folder_name)
-
                     if action.lower() == "create":
                         os.makedirs(folder_path, exist_ok=True)
                         send_ctrl(conn, f"OK@Subfolder '{folder_name}' created.")
                         logging.info(f"{addr} {action} subfolder: {folder_name}")
                         print(f"[SUBFOLDER] {addr} created '{folder_name}'")
-
                     elif action.lower() == "delete":
                         if os.path.exists(folder_path):
                             os.rmdir(folder_path)
@@ -350,7 +324,6 @@ def handle_client (conn,addr):
                     else:
                         send_ctrl(conn, "ERR@Invalid subfolder command.")
                         print(f"[SUBFOLDER ERROR] {addr} sent invalid command '{action}'")
-
                 except Exception as e:
                     try:
                         send_ctrl(conn, f"ERR@Subfolder operation failed: {str(e)}")
@@ -366,25 +339,21 @@ def handle_client (conn,addr):
                 pass
             logging.error(f"Client {addr} error: {str(e)}")
 
-
-
     print(f"[DISCONNECT] Client disconnected: {addr}")
     logging.info(f"Client disconnected: {addr}")
     conn.close()
-
 
 def main():
     os.makedirs(SERVER_PATH, exist_ok=True)
     print(f"[SERVER] Started and listening on {IP}:{PORT}")
     logging.info(f"Server started on {IP}:{PORT}")
-    server = socket.socket(socket.AF_INET,socket.SOCK_STREAM) ## used IPV4 and TCP connection
-    server.bind(ADDR) # bind the address
-    server.listen() ## start listening
+    server = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    server.bind(ADDR)
+    server.listen()
     while True:
-        conn, addr = server.accept() ### accept a connection from a client
-        thread = threading.Thread(target = handle_client, args = (conn, addr)) ## assigning a thread for each client
+        conn, addr = server.accept()
+        thread = threading.Thread(target = handle_client, args = (conn, addr))
         thread.start()
-
 
 if __name__ == "__main__":
     main()

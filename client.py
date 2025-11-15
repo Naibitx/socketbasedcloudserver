@@ -4,7 +4,7 @@ import time
 from analytics import record_transfer, record_event
 from cryptography.fernet import Fernet
 
-IP = "10.200.102.97"
+IP = "10.200.214.59"
 PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
@@ -34,7 +34,7 @@ def connection_to_server():
     global cipher
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client_socket.connect(ADDR)
-    key_msg = recv_line(client_socket)  # read only the AES key line
+    key_msg = recv_line(client_socket)  # read AES key with newline handled
     cipher = Fernet(key_msg)
     print(f"Connected to server in {IP}:{PORT}")
     return client_socket
@@ -60,7 +60,8 @@ def upload_file(client_socket, filename):
         print("File cant be found OH OH")
         return
     ext = os.path.splitext(filename)[1].lower()
-    file_sizes = {".txt": 25*1024*1024, ".mp3": 1*1024*1024*1024, ".wav": 1*1024*1024*1024, ".mp4": 2*1024*1024*1024, ".avi": 2*1024*1024*1024, ".mkv": 2*1024*1024*1024}
+    file_sizes = {".txt": 25*1024*1024, ".mp3": 1*1024*1024*1024, ".wav": 1*1024*1024*1024,
+                  ".mp4": 2*1024*1024*1024, ".avi": 2*1024*1024*1024, ".mkv": 2*1024*1024*1024}
     filesize = os.path.getsize(filename)
     if ext not in file_sizes or filesize < file_sizes[ext]:
         print(f"File type or size not allowed. Minimum {file_sizes.get(ext,0)} bytes.")
@@ -120,12 +121,7 @@ def download_file(client_socket, filename):
 def menu_client(client_socket):
     while True:
         print("\n-----Menu-----")
-        print(" upload <filename>\n")
-        print(" download <filename>\n")
-        print(" delete <filename>\n")
-        print(" dir\n")
-        print(" subfolder <create|delete> <folder>\n")
-        print(" exit")
+        print(" upload <filename>\n download <filename>\n delete <filename>\n dir\n subfolder <create|delete> <folder>\n exit")
         command = input("\n Enter command: ").strip()
         if command.lower() == "exit":
             client_socket.send("LOGOUT@".encode(FORMAT))
