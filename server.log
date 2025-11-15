@@ -45,3 +45,8 @@
 2025-11-14 21:56:27,761 - INFO - Server started on 0.0.0.0:4450
 2025-11-14 22:11:09,281 - INFO - Authentication failed for ('10.200.102.97', 58650).
 2025-11-14 22:12:17,937 - INFO - Server started on 0.0.0.0:4450
+2025-11-15 03:46:24,052 - INFO - Server listening on 0.0.0.0:4450
+2025-11-15 03:46:44,211 - INFO - Client connected from ('127.0.0.1', 43568)
+2025-11-15 03:46:53,563 - INFO - Authentication successful for diego from ('127.0.0.1', 43568)
+2025-11-15 03:47:41,111 - INFO - [('127.0.0.1', 43568)] requested LOGOUT
+2025-11-15 03:47:41,112 - INFO - Client disconnected ('127.0.0.1', 43568)
