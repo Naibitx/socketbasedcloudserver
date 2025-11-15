@@ -7,7 +7,6 @@ import time
 from analytics import record_transfer, record_event
 from cryptography.fernet import Fernet
 
-
 logging.basicConfig(
     filename='server.log', 
     level=logging.INFO,
@@ -43,33 +42,88 @@ def generate_salt():
 def hash_password(password, salt):
     return hashlib.sha256(password.encode() + salt).hexdigest()
 
+_leftover = {}
+
+def send_ctrl(conn, text):
+    conn.sendall((text + "\n").encode(FORMAT))
+
+def recv_ctrl(conn):
+    fil = conn.fileno()
+    if fil not in _leftover:
+        _leftover[fil] = b""
+    if b"\n" in _leftover[fil]:
+        line, rest = _leftover[fil].split(b"\n", 1)
+        _leftover[fil] = rest
+        return line.decode(FORMAT)
+    buffer = _leftover[fil]
+    while True:
+        try:
+            chunk = conn.recv(1024)
+        except Exception:
+            return None
+        if not chunk:
+            # connection closed
+            if buffer:
+                # return what we have without newline
+                val = buffer.decode(FORMAT)
+                _leftover[fil] = b""
+                return val
+            return None
+        buffer += chunk
+        if b"\n" in buffer:
+            line, rest = buffer.split(b"\n", 1)
+            _leftover[fil] = rest
+            return line.decode(FORMAT)
+        # keep looping until newline
+
+def recv_raw(conn, n):
+    fil = conn.fileno()
+    if fil not in _leftover:
+        _leftover[fil] = b""
+    data = b""
+    if _leftover[fil]:
+        take = _leftover[fil][:n]
+        data += take
+        _leftover[fil] = _leftover[fil][len(take):]
+    while len(data) < n:
+        chunk = conn.recv(n - len(data))
+        if not chunk:
+            break
+        data += chunk
+    return data
+
 def authenticate(conn):
         try:
-            conn.send(AES_Key + b"@")
-            conn.send("AUTH@Username:".encode(FORMAT))
-            username = conn.recv(SIZE).decode(FORMAT)
-            conn.send("AUTH@Password:".encode(FORMAT))
-            password = conn.recv(SIZE).decode(FORMAT)
+            conn.sendall(AES_Key + b"\n")
+            send_ctrl(conn, "AUTH@Username:")
+            username = recv_ctrl(conn)
+            if username is None:
+                return False
+            send_ctrl(conn, "AUTH@Password:")
+            password = recv_ctrl(conn)
+            if password is None:
+                return False
 
             with open("users.txt", "r") as f:
                 for line in f:
                     stored_user, stored_hash, stored_salt = line.strip().split(":")
                     if username == stored_user:
-                        # Convert the stored salt from hex to bytes
                         salt = bytes.fromhex(stored_salt)
-                        # Hash the provided password with the stored salt
                         hashed_pw = hash_password(password, salt)
                         if hashed_pw == stored_hash:
-                            conn.send("OK@Login successful.".encode(FORMAT))
+                            send_ctrl(conn, "OK@Login successful.")
                             print(f"[AUTH] Login successful for user: {username}")
                             return True
-                conn.send("ERR@Invalid credentials.".encode(FORMAT))
+                send_ctrl(conn, "ERR@Invalid credentials.")
                 logging.warning(f"Failed login attempt for user: {username}")
                 print(f"[AUTH] Failed login attempt for user: {username}")
                 return False
         except Exception as e:
             logging.error (f"Authentication error: {str(e)}")
-            conn.send(f"ERR@Authentication error: {str(e)}".encode(FORMAT))
+            try:
+                send_ctrl(conn, f"ERR@Authentication error: {str(e)}")
+            except Exception:
+                pass
             return False
 
 ### to handle the clients
@@ -85,15 +139,15 @@ def handle_client (conn,addr):
 
     logging.info(f"{addr} - Authentication successful.")
     print(f"[CONNECT] Client connected: {addr}")
-    conn.send("OK@Welcome to the server".encode(FORMAT))
+    send_ctrl(conn, "OK@Welcome to the server")
 
     while True:
         try:
-            data = conn.recv(SIZE).decode(FORMAT)
-            if not data:
+            ctrl = recv_ctrl(conn)
+            if ctrl is None:
                 break
 
-            data = data.split("@")
+            data = ctrl.split("@")
             cmd = data[0]
             CHUNK_SIZE = 64 * 1024  # 64 KB per chunk for faster transfer
 
@@ -106,7 +160,7 @@ def handle_client (conn,addr):
                 print(f"[TASK] Command received from {addr}")
                 logging.info(f"{addr} issued TASK command")
                 send_data += "LOGOUT from the server.\n"
-                conn.send(send_data.encode(FORMAT))
+                send_ctrl(conn, send_data.strip())
 
             elif cmd == "UPLOAD":
                 # Analytics: start timing upload on the server
@@ -119,61 +173,66 @@ def handle_client (conn,addr):
                     # Check file type first
                     ext = os.path.splitext(filename)[1].lower()
                     if ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
-                        conn.send("ERR@Unsupported file type.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Unsupported file type.")
                         continue
 
                     # Check if file exists and ask if user wants to overwrite
                     if os.path.exists(filepath):
-                        conn.send("ERR@File exists. Overwrite? (y/n)".encode(FORMAT))
-                        choice = conn.recv(SIZE).decode(FORMAT)
-                        if choice.lower() != "y":
-                            conn.send("OK@Upload cancelled.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@File exists. Overwrite? (y/n)")
+                        choice = recv_ctrl(conn)
+                        if choice is None or choice.lower() != "y":
+                            send_ctrl(conn, "OK@Upload cancelled.")
                             logging.info(f"{addr} cancelled upload of file: {filename}")
                             print(f"[UPLOAD] {addr} cancelled upload of {filename}")
                             continue
 
-                    # Generate (or reuse) file path
                     filepath = os.path.join(SERVER_PATH, filename)
 
-                    conn.send("OK@Ready to receive.".encode(FORMAT))
+                    send_ctrl(conn, "OK@Ready to receive.")
 
-                    # Receive file in chunks
                     received = 0
                     with open(filepath, "wb") as f:
                         while received < filesize:
-                            bytes_read = conn.recv(min(CHUNK_SIZE, filesize - received))
+                            to_read = min(CHUNK_SIZE, filesize - received)
+                            bytes_read = recv_raw(conn, to_read)
                             if not bytes_read:
                                 break
                             f.write(bytes_read)
                             received += len(bytes_read)
 
-                    # Verify actual file size
+                    # If no bytes were written and connection closed, handle gracefully
+                    if not os.path.exists(filepath):
+                        send_ctrl(conn, f"ERR@Upload failed: incomplete transfer.")
+                        continue
+
                     actual_size = os.path.getsize(filepath)
                     if ext == ".txt" and actual_size < 25 * 1024 * 1024:
                         os.remove(filepath)
-                        conn.send("ERR@Text file too small (min 25 MB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Text file too small (min 25 MB).")
                         continue
                     elif ext in [".mp3", ".wav"] and actual_size < 1 * 1024 * 1024 * 1024:
                         os.remove(filepath)
-                        conn.send("ERR@Audio file too small (min 1 GB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Audio file too small (min 1 GB).")
                         continue
                     elif ext in [".mp4", ".avi", ".mkv"] and actual_size < 2 * 1024 * 1024 * 1024:
                         os.remove(filepath)
-                        conn.send("ERR@Video file too small (min 2 GB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Video file too small (min 2 GB).")
                         continue
 
-                    conn.send(f"OK@Uploaded {filename}".encode(FORMAT))
+                    send_ctrl(conn, f"OK@Uploaded {filename}")
                     logging.info(f"{addr} uploaded file: {filename}")
                     print(f"[UPLOAD] {addr} → {filename}")
 
-                    # Analytics: record successful upload on the server
                     upload_end = time.perf_counter()
                     record_transfer("server", "UPLOAD", filename, actual_size, upload_start, upload_end)
 
                 except Exception as e:
                     logging.error(f"Upload failed for {addr}: {str(e)}")
                     print(f"[UPLOAD ERROR] {addr} failed: {str(e)}")
-                    conn.send(f"ERR@Upload failed: {str(e)}".encode(FORMAT))
+                    try:
+                        send_ctrl(conn, f"ERR@Upload failed: {str(e)}")
+                    except Exception:
+                        pass
 
             elif cmd == "DOWNLOAD":
                 # Analytics: start timing download on the server
@@ -183,35 +242,31 @@ def handle_client (conn,addr):
                     filepath = os.path.join(SERVER_PATH, filename)
 
                     if not os.path.exists(filepath):
-                        conn.send("ERR@File not found.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@File not found.")
                         continue
 
-                    # Check file type and minimum size
                     filesize = os.path.getsize(filepath)
                     ext = os.path.splitext(filename)[1].lower()
 
                     if ext == ".txt" and filesize < 25 * 1024 * 1024:
-                        conn.send("ERR@Text file too small (min 25 MB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Text file too small (min 25 MB).")
                         continue
                     elif ext in [".mp3", ".wav"] and filesize < 1 * 1024 * 1024 * 1024:
-                        conn.send("ERR@Audio file too small (min 1 GB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Audio file too small (min 1 GB).")
                         continue
                     elif ext in [".mp4", ".avi", ".mkv"] and filesize < 2 * 1024 * 1024 * 1024:
-                        conn.send("ERR@Video file too small (min 2 GB).".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Video file too small (min 2 GB).")
                         continue
                     elif ext not in [".txt", ".mp3", ".wav", ".mp4", ".avi", ".mkv"]:
-                        conn.send("ERR@Unsupported file type.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Unsupported file type.")
                         continue
 
-                    # Send file size to client
-                    conn.send(f"OK@{filesize}".encode(FORMAT))
+                    send_ctrl(conn, f"OK@{filesize}")
 
-                    # Wait for client ready
-                    ack = conn.recv(SIZE).decode(FORMAT)
-                    if ack != "READY":
+                    ack = recv_ctrl(conn)
+                    if ack is None or ack != "READY":
                         continue
 
-                    # Send file in chunks
                     with open(filepath, "rb") as f:
                         while True:
                             bytes_read = f.read(CHUNK_SIZE)
@@ -219,16 +274,18 @@ def handle_client (conn,addr):
                                 break
                             conn.sendall(bytes_read)
 
-                    conn.send("OK@Download complete.".encode(FORMAT))
+                    send_ctrl(conn, "OK@Download complete.")
                     logging.info(f"{addr} downloaded file: {filename}")
                     print(f"[DOWNLOAD] {addr} ← {filename}")
 
-                    # Analytics: record successful download on the server
                     download_end = time.perf_counter()
                     record_transfer("server", "DOWNLOAD", filename, filesize, download_start, download_end)
 
                 except Exception as e:
-                    conn.send(f"ERR@Download failed: {str(e)}".encode(FORMAT))
+                    try:
+                        send_ctrl(conn, f"ERR@Download failed: {str(e)}")
+                    except Exception:
+                        pass
                     logging.error(f"Download failed for {addr}: {str(e)}")
                     print(f"[DOWNLOAD ERROR] {addr} failed: {str(e)}")
 
@@ -238,16 +295,19 @@ def handle_client (conn,addr):
                     filepath = os.path.join(SERVER_PATH, filename)
 
                     if not os.path.exists(filepath):
-                        conn.send("ERR@File not found.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@File not found.")
                         continue
 
                     os.remove(filepath)
-                    conn.send(f"OK@Deleted {filename}".encode(FORMAT))
+                    send_ctrl(conn, f"OK@Deleted {filename}")
                     logging.info(f"{addr} deleted file: {filename}")
                     print(f"[DELETE] {addr} removed {filename}")
 
                 except Exception as e:
-                    conn.send(f"ERR@Delete failed: {str(e)}".encode(FORMAT))
+                    try:
+                        send_ctrl(conn, f"ERR@Delete failed: {str(e)}")
+                    except Exception:
+                        pass
                     logging.error(f"Delete failed for {addr}: {str(e)}")
                     print(f"[DELETE ERROR] {addr} failed: {str(e)}")
 
@@ -255,11 +315,14 @@ def handle_client (conn,addr):
                 try:
                     items = os.listdir(SERVER_PATH)
                     file_list = "\n".join(items) if items else "Directory is empty."
-                    conn.send(f"OK@{file_list}".encode(FORMAT))
+                    send_ctrl(conn, f"OK@{file_list}")
                     logging.info(f"{addr} requested directory listing")
                     print(f"[DIR] {addr} requested directory listing")
                 except Exception as e:
-                    conn.send(f"ERR@Directory read failed: {str(e)}".encode(FORMAT))
+                    try:
+                        send_ctrl(conn, f"ERR@Directory read failed: {str(e)}")
+                    except Exception:
+                        pass
                     logging.error(f"Directory listing failed for {addr}: {str(e)}")
                     print(f"[DIR ERROR] {addr} failed directory listing: {str(e)}")
 
@@ -271,30 +334,36 @@ def handle_client (conn,addr):
 
                     if action.lower() == "create":
                         os.makedirs(folder_path, exist_ok=True)
-                        conn.send(f"OK@Subfolder '{folder_name}' created.".encode(FORMAT))
+                        send_ctrl(conn, f"OK@Subfolder '{folder_name}' created.")
                         logging.info(f"{addr} {action} subfolder: {folder_name}")
                         print(f"[SUBFOLDER] {addr} created '{folder_name}'")
 
                     elif action.lower() == "delete":
                         if os.path.exists(folder_path):
                             os.rmdir(folder_path)
-                            conn.send(f"OK@Subfolder '{folder_name}' deleted.".encode(FORMAT))
+                            send_ctrl(conn, f"OK@Subfolder '{folder_name}' deleted.")
                             logging.info(f"{addr} {action} subfolder: {folder_name}")
                             print(f"[SUBFOLDER] {addr} deleted '{folder_name}'")
                         else:
-                            conn.send("ERR@Subfolder not found.".encode(FORMAT))
+                            send_ctrl(conn, "ERR@Subfolder not found.")
                             print(f"[SUBFOLDER ERROR] {addr} tried to delete missing folder '{folder_name}'")
                     else:
-                        conn.send("ERR@Invalid subfolder command.".encode(FORMAT))
+                        send_ctrl(conn, "ERR@Invalid subfolder command.")
                         print(f"[SUBFOLDER ERROR] {addr} sent invalid command '{action}'")
 
                 except Exception as e:
-                    conn.send(f"ERR@Subfolder operation failed: {str(e)}".encode(FORMAT))
+                    try:
+                        send_ctrl(conn, f"ERR@Subfolder operation failed: {str(e)}")
+                    except Exception:
+                        pass
                     logging.error(f"Subfolder operation failed for {addr}: {str(e)}")
                     print(f"[SUBFOLDER ERROR] {addr} failed {action} '{folder_name}': {str(e)}")
 
         except Exception as e:
-            conn.send(f"ERR@{str(e)}".encode(FORMAT))
+            try:
+                send_ctrl(conn, f"ERR@{str(e)}")
+            except Exception:
+                pass
             logging.error(f"Client {addr} error: {str(e)}")
 
 

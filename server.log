@@ -28,3 +28,15 @@
 2025-11-14 14:52:54,083 - INFO - Server started on 0.0.0.0:4450
 2025-11-14 14:53:09,449 - INFO - Server started on 0.0.0.0:4450
 2025-11-14 14:54:33,320 - INFO - ('127.0.0.1', 53321) - Authentication successful.
+2025-11-14 18:31:03,003 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 18:31:20,886 - INFO - ('127.0.0.1', 56523) - Authentication successful.
+2025-11-14 18:39:18,859 - INFO - Client disconnected: ('127.0.0.1', 56523)
+2025-11-14 18:39:30,399 - INFO - ('127.0.0.1', 56613) - Authentication successful.
+2025-11-14 18:39:39,671 - INFO - ('127.0.0.1', 56613) uploaded file: testing.txt
+2025-11-14 20:46:05,861 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 20:46:14,686 - INFO - ('127.0.0.1', 57045) - Authentication successful.
+2025-11-14 20:46:34,124 - ERROR - Download failed for ('127.0.0.1', 57045): [Errno 54] Connection reset by peer
+2025-11-14 20:46:34,125 - INFO - Client disconnected: ('127.0.0.1', 57045)
+2025-11-14 20:49:23,642 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 20:49:48,865 - INFO - Server started on 0.0.0.0:4450
+2025-11-14 20:51:08,063 - INFO - Server started on 0.0.0.0:4450
