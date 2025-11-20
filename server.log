@@ -50,3 +50,11 @@
 2025-11-15 03:46:53,563 - INFO - Authentication successful for diego from ('127.0.0.1', 43568)
 2025-11-15 03:47:41,111 - INFO - [('127.0.0.1', 43568)] requested LOGOUT
 2025-11-15 03:47:41,112 - INFO - Client disconnected ('127.0.0.1', 43568)
+2025-11-20 15:38:18,850 - INFO - Server listening on 0.0.0.0:4450
+2025-11-20 15:39:21,271 - INFO - Server listening on localhost:4450
+2025-11-20 15:39:23,992 - INFO - Client connected from ('127.0.0.1', 56172)
+2025-11-20 15:39:28,338 - INFO - Authentication successful for naibys from ('127.0.0.1', 56172)
+2025-11-20 15:39:34,735 - INFO - [('127.0.0.1', 56172)] uploaded file testing.txt (30485773 bytes)
+2025-11-20 15:39:52,260 - INFO - [('127.0.0.1', 56172)] deleted file testing.txt
+2025-11-20 15:42:24,363 - INFO - [('127.0.0.1', 56172)] uploaded file testing.txt (30485773 bytes)
+2025-11-20 15:42:38,329 - INFO - [('127.0.0.1', 56172)] downloaded file testing.txt (30485773 bytes)

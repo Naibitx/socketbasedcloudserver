@@ -13,7 +13,7 @@ except Exception:
     def record_event(*args, **kwargs):
         pass
 
-IP = "10.200.102.97" 
+IP = "localhost" 
 PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
@@ -194,7 +194,6 @@ def menu_client(client_socket):
             print("Invalid command syntax.")
             continue
 
-        # Receive generic response for these commands
         data = client_socket.recv(SIZE).decode(FORMAT)
         print("Server:", data)
 

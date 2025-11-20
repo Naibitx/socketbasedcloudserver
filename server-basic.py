@@ -6,7 +6,6 @@ import logging
 import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Try to import analytics; if it fails, define no-op functions
 try:
     from analytics import record_transfer, record_event
 except Exception:
@@ -23,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-IP = "0.0.0.0"          # Listen on all interfaces
+IP = "localhost"          # Listen on all interfaces
 PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
