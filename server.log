@@ -58,3 +58,15 @@
 2025-11-20 15:39:52,260 - INFO - [('127.0.0.1', 56172)] deleted file testing.txt
 2025-11-20 15:42:24,363 - INFO - [('127.0.0.1', 56172)] uploaded file testing.txt (30485773 bytes)
 2025-11-20 15:42:38,329 - INFO - [('127.0.0.1', 56172)] downloaded file testing.txt (30485773 bytes)
+2025-11-20 15:52:49,678 - INFO - [('127.0.0.1', 56172)] requested LOGOUT
+2025-11-20 15:52:49,681 - INFO - Client disconnected ('127.0.0.1', 56172)
+2025-11-20 15:54:27,913 - INFO - Server listening on localhost:4450
+2025-11-20 15:54:32,459 - INFO - Client connected from ('127.0.0.1', 56389)
+2025-11-20 15:54:39,701 - INFO - Authentication successful for naibys from ('127.0.0.1', 56389)
+2025-11-20 15:54:48,407 - INFO - [('127.0.0.1', 56389)] uploaded file testing.txt (30485773 bytes)
+2025-11-20 15:55:01,213 - INFO - [('127.0.0.1', 56389)] downloaded file testing.txt (30485773 bytes)
+2025-11-20 15:55:13,209 - INFO - [('127.0.0.1', 56389)] uploaded file testing.txt (30485773 bytes)
+2025-11-20 15:55:22,022 - INFO - [('127.0.0.1', 56389)] deleted file testing.txt
+2025-11-20 15:56:00,284 - INFO - [('127.0.0.1', 56389)] uploaded file testing.txt (30485773 bytes)
+2025-11-20 15:56:22,142 - INFO - [('127.0.0.1', 56389)] requested LOGOUT
+2025-11-20 15:56:22,144 - INFO - Client disconnected ('127.0.0.1', 56389)
