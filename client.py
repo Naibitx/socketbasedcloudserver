@@ -1,8 +1,9 @@
 import socket
 import os
 import time
+import getpass
 
-# Try to import analytics; if it fails, define no-op functions
+
 try:
     from analytics import record_transfer, record_event
 except Exception:
@@ -12,7 +13,7 @@ except Exception:
     def record_event(*args, **kwargs):
         pass
 
-IP = "127.0.0.1"  # Use 127.0.0.1 when client and server are on the same machine
+IP = "10.200.102.97" 
 PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
@@ -50,7 +51,7 @@ def authenticate(client_socket):
                 client_socket.send(username.encode(FORMAT))
 
             elif step == "PASSWORD":
-                password = input("Password: ")
+                password = getpass.getpass("Password: ")
                 client_socket.send(password.encode(FORMAT))
 
             elif step == "OK":
@@ -75,32 +76,37 @@ def authenticate(client_socket):
             return False
 
 
-def upload_file(client_socket, filename):
+def upload_file(client_socket, filename):  # file uploading function
     if not os.path.exists(filename):
-        print("File not found.")
+        print("File cant be found OH OH")
         return
 
+    # Just get the size; let the server enforce any rules
     filesize = os.path.getsize(filename)
-    cmd = f"UPLOAD@{os.path.basename(filename)}@{filesize}"
-    client_socket.send(cmd.encode(FORMAT))
+    base_name = os.path.basename(filename)
 
+    # Tell the server we want to upload
+    client_socket.send(f"UPLOAD@{base_name}@{filesize}\n".encode(FORMAT))
+
+    # First response: either error, overwrite prompt, or READY
     response = client_socket.recv(SIZE).decode(FORMAT)
     status, msg = response.split("@", 1)
 
-    if status == "ERR":
-        if "Overwrite" in msg:
-            choice = input("Server says file exists. Overwrite? (y/n): ").strip().lower()
-            client_socket.send(choice.encode(FORMAT))
-            response = client_socket.recv(SIZE).decode(FORMAT)
-            status, msg = response.split("@", 1)
-            if status == "OK" and "cancelled" in msg:
-                print("Upload cancelled by user choice.")
-                return
-        else:
+    # Handle "file exists, overwrite?"
+    if status == "ERR" and "Overwrite" in msg:
+        choice = input("Server says file exists. Overwrite? (y/n): ").strip().lower()
+        client_socket.send(choice.encode(FORMAT))
+        response = client_socket.recv(SIZE).decode(FORMAT)
+        status, msg = response.split("@", 1)
+        if status == "OK" and "cancelled" in msg:
+            print("Upload cancelled.")
+            return
+        elif status == "ERR":
             print("Server error:", msg)
             return
 
-    if status == "OK" and msg == "READY":
+    # If server is ready, stream the file
+    if status == "OK":
         start = time.perf_counter()
         with open(filename, "rb") as f:
             while True:
@@ -109,14 +115,15 @@ def upload_file(client_socket, filename):
                     break
                 client_socket.sendall(data)
         end = time.perf_counter()
-        record_transfer(
-            "client", "UPLOAD", os.path.basename(filename),
-            filesize, start, end, status="OK"
-        )
+
+        # Log analytics
+        record_transfer("client", "UPLOAD", base_name, filesize, start, end)
+
+        # Final confirmation from server
         final_msg = client_socket.recv(SIZE).decode(FORMAT)
         print("Server:", final_msg)
     else:
-        print("Unexpected response from server:", response)
+        print("Server error:", msg)
 
 
 def download_file(client_socket, filename):
