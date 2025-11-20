@@ -5,7 +5,6 @@ import hashlib
 import logging
 import time
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Try to import analytics; if it fails, define no-op functions
 try:
@@ -29,8 +28,7 @@ PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
 FORMAT = "utf-8"
-SERVER_PATH = os.path.join(BASE_DIR, "server")
-os.makedirs(SERVER_PATH, exist_ok=True)
+SERVER_PATH = "socketbasedcloudserver/server"
 
 
 def check_credentials(username: str, password: str) -> bool:
