@@ -5,7 +5,7 @@ import hashlib
 import logging
 import time
 
-
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Try to import analytics; if it fails, define no-op functions
 try:
     from analytics import record_transfer, record_event
@@ -28,14 +28,11 @@ PORT = 4450
 ADDR = (IP, PORT)
 SIZE = 64 * 1024
 FORMAT = "utf-8"
-SERVER_PATH = "socketbasedcloudserver/server"
+SERVER_PATH = os.path.join(BASE_DIR, "server")
+os.makedirs(SERVER_PATH, exist_ok=True)
 
 
 def check_credentials(username: str, password: str) -> bool:
-    """
-    Verify username/password using users.txt with salted SHA-256 hashes.
-    Each line in users.txt: username:hash:salt_hex
-    """
     try:
         with open("users.txt", "r") as f:
             for line in f:
@@ -57,13 +54,6 @@ def check_credentials(username: str, password: str) -> bool:
 
 
 def authenticate(conn: socket.socket, addr):
-    """
-    AUTH handshake:
-    - Server sends AUTH@USERNAME  -> client sends username
-    - Server sends AUTH@PASSWORD -> client sends password
-    - Server sends AUTH@OK or AUTH@FAIL
-    Returns username on success or None on failure.
-    """
     try:
         # Ask for username
         conn.send("AUTH@USERNAME".encode(FORMAT))
@@ -136,7 +126,6 @@ def handle_upload(conn, addr, parts):
             received += len(chunk)
     end = time.perf_counter()
 
-    # Enforce minimum file sizes like in your spec
     actual_size = os.path.getsize(filepath)
     if ext == ".txt" and actual_size < 25 * 1024 * 1024:
         os.remove(filepath)

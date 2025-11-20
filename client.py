@@ -81,18 +81,16 @@ def upload_file(client_socket, filename):  # file uploading function
         print("File cant be found OH OH")
         return
 
-    # Just get the size; let the server enforce any rules
     filesize = os.path.getsize(filename)
     base_name = os.path.basename(filename)
 
-    # Tell the server we want to upload
     client_socket.send(f"UPLOAD@{base_name}@{filesize}\n".encode(FORMAT))
 
-    # First response: either error, overwrite prompt, or READY
+    #first response: either error, overwrite prompt, or READY
     response = client_socket.recv(SIZE).decode(FORMAT)
     status, msg = response.split("@", 1)
 
-    # Handle "file exists, overwrite?"
+    #handle "file exists, overwrite?"
     if status == "ERR" and "Overwrite" in msg:
         choice = input("Server says file exists. Overwrite? (y/n): ").strip().lower()
         client_socket.send(choice.encode(FORMAT))
@@ -105,7 +103,7 @@ def upload_file(client_socket, filename):  # file uploading function
             print("Server error:", msg)
             return
 
-    # If server is ready, stream the file
+    #if server is ready, stream the file
     if status == "OK":
         start = time.perf_counter()
         with open(filename, "rb") as f:
